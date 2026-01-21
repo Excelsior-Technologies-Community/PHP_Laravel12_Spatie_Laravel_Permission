@@ -1,5 +1,26 @@
 # PHP_Laravel12_Spatie_Laravel_Permission
 
+<p align="center">
+    <a href="https://laravel.com">
+        <img src="https://img.shields.io/badge/Laravel-12-red?style=flat&logo=laravel" alt="Laravel 12">
+    </a>
+    <a href="https://www.php.net">
+        <img src="https://img.shields.io/badge/PHP-8.2+-blue?style=flat&logo=php" alt="PHP 8.2+">
+    </a>
+    <a href="https://spatie.be/docs/laravel-permission">
+        <img src="https://img.shields.io/badge/Spatie-Laravel%20Permission-green?style=flat" alt="Spatie Laravel Permission">
+    </a>
+    <a href="https://laravel.com/docs/starter-kits#laravel-breeze">
+        <img src="https://img.shields.io/badge/Auth-Laravel%20Breeze-purple?style=flat" alt="Laravel Breeze">
+    </a>
+    <a href="https://www.mysql.com">
+        <img src="https://img.shields.io/badge/Database-MySQL-orange?style=flat&logo=mysql" alt="MySQL">
+    </a>
+    <a href="#">
+        <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat" alt="MIT License">
+    </a>
+</p>
+
 
 ##  Overview
 
