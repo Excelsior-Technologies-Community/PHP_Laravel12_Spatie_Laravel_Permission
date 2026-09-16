@@ -12,16 +12,52 @@ use Spatie\Permission\Models\Role;
 class RoleController extends Controller
 {
     /**
-     * Display all roles.
+     * Display all roles with search, sorting and pagination.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $roles = Role::with('permissions')
-            ->withCount('users')
-            ->orderBy('name')
-            ->paginate(10);
+        $search = $request->input('search');
 
-        return view('admin.roles.index', compact('roles'));
+        $sort = $request->input('sort', 'name');
+
+        $direction = $request->input('direction', 'asc');
+
+        $perPage = (int) $request->input('per_page', 10);
+
+        $allowedSorts = [
+            'name',
+            'created_at',
+        ];
+
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'name';
+        }
+
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = 'asc';
+        }
+
+        if (!in_array($perPage, [5, 10, 25, 50], true)) {
+            $perPage = 10;
+        }
+
+        $roles = Role::query()
+            ->with('permissions')
+            ->withCount('users')
+            ->when($search, function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->orderBy($sort, $direction)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view('admin.roles.index', compact(
+            'roles',
+            'search',
+            'sort',
+            'direction',
+            'perPage'
+        ));
     }
 
     /**
@@ -46,8 +82,12 @@ class RoleController extends Controller
                 'max:255',
                 'unique:roles,name',
             ],
+
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:permissions,name'],
+
+            'permissions.*' => [
+                'exists:permissions,name',
+            ],
         ]);
 
         $role = Role::create([
@@ -85,8 +125,10 @@ class RoleController extends Controller
     /**
      * Update a role.
      */
-    public function update(Request $request, Role $role): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        Role $role
+    ): RedirectResponse {
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -94,15 +136,21 @@ class RoleController extends Controller
                 'max:255',
                 'unique:roles,name,' . $role->id,
             ],
+
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:permissions,name'],
+
+            'permissions.*' => [
+                'exists:permissions,name',
+            ],
         ]);
 
         $role->update([
             'name' => $validated['name'],
         ]);
 
-        $role->syncPermissions($validated['permissions'] ?? []);
+        $role->syncPermissions(
+            $validated['permissions'] ?? []
+        );
 
         return redirect()
             ->route('admin.roles.index')
@@ -110,7 +158,7 @@ class RoleController extends Controller
     }
 
     /**
-     * Delete a role.
+     * Delete a single role.
      */
     public function destroy(Role $role): RedirectResponse
     {
@@ -133,5 +181,59 @@ class RoleController extends Controller
         return redirect()
             ->route('admin.roles.index')
             ->with('success', 'Role deleted successfully.');
+    }
+
+    /**
+     * Bulk delete roles.
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'roles' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'roles.*' => [
+                'integer',
+                'exists:roles,id',
+            ],
+        ]);
+
+        $deleted = 0;
+        $skipped = 0;
+
+        $roles = Role::whereIn('id', $validated['roles'])
+            ->get();
+
+        foreach ($roles as $role) {
+
+            // Never delete admin role.
+            if ($role->name === 'admin') {
+                $skipped++;
+                continue;
+            }
+
+            // Do not delete roles assigned to users.
+            if ($role->users()->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            $role->delete();
+
+            $deleted++;
+        }
+
+        $message = "{$deleted} role(s) deleted successfully.";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} role(s) skipped because they are protected, are the admin role, or have assigned users.";
+        }
+
+        return redirect()
+            ->route('admin.roles.index')
+            ->with('success', $message);
     }
 }

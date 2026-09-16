@@ -13,13 +13,56 @@ class PermissionController extends Controller
     /**
      * Display all permissions.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $permissions = Permission::withCount('roles')
-            ->orderBy('name')
-            ->paginate(10);
+        $search = $request->input('search');
 
-        return view('admin.permissions.index', compact('permissions'));
+        $sort = $request->input('sort', 'name');
+
+        $direction = $request->input('direction', 'asc');
+
+        $perPage = (int) $request->input('per_page', 10);
+
+        $allowedSorts = [
+            'name',
+            'created_at',
+        ];
+
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'name';
+        }
+
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = 'asc';
+        }
+
+        if (!in_array($perPage, [5, 10, 25, 50], true)) {
+            $perPage = 10;
+        }
+
+        $permissions = Permission::query()
+            ->withCount('roles')
+            ->when($search, function ($query) use ($search) {
+                $query->where(
+                    'name',
+                    'like',
+                    "%{$search}%"
+                );
+            })
+            ->orderBy($sort, $direction)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return view(
+            'admin.permissions.index',
+            compact(
+                'permissions',
+                'search',
+                'sort',
+                'direction',
+                'perPage'
+            )
+        );
     }
 
     /**
@@ -51,14 +94,18 @@ class PermissionController extends Controller
 
         return redirect()
             ->route('admin.permissions.index')
-            ->with('success', 'Permission created successfully.');
+            ->with(
+                'success',
+                'Permission created successfully.'
+            );
     }
 
     /**
      * Delete a permission.
      */
-    public function destroy(Permission $permission): RedirectResponse
-    {
+    public function destroy(
+        Permission $permission
+    ): RedirectResponse {
         if ($permission->roles()->exists()) {
             return back()->with(
                 'error',
@@ -70,6 +117,62 @@ class PermissionController extends Controller
 
         return redirect()
             ->route('admin.permissions.index')
-            ->with('success', 'Permission deleted successfully.');
+            ->with(
+                'success',
+                'Permission deleted successfully.'
+            );
+    }
+
+    /**
+     * Bulk delete permissions.
+     */
+    public function bulkDestroy(
+        Request $request
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'permissions' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'permissions.*' => [
+                'integer',
+                'exists:permissions,id',
+            ],
+        ]);
+
+        $deleted = 0;
+        $skipped = 0;
+
+        $permissions = Permission::whereIn(
+            'id',
+            $validated['permissions']
+        )->get();
+
+        foreach ($permissions as $permission) {
+
+            // Never delete permissions assigned to roles.
+            if ($permission->roles()->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            $permission->delete();
+
+            $deleted++;
+        }
+
+        $message =
+            "{$deleted} permission(s) deleted successfully.";
+
+        if ($skipped > 0) {
+            $message .=
+                " {$skipped} permission(s) skipped because they are assigned to roles.";
+        }
+
+        return redirect()
+            ->route('admin.permissions.index')
+            ->with('success', $message);
     }
 }
