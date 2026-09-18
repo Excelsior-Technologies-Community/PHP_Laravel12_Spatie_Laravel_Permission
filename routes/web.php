@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AuthorizationDashboardController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserManagementController;
@@ -9,19 +10,13 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Home Route
+| Home & User Dashboard
 |--------------------------------------------------------------------------
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('dashboard');
 });
-
-/*
-|--------------------------------------------------------------------------
-| User Dashboard
-|--------------------------------------------------------------------------
-*/
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -31,211 +26,56 @@ Route::get('/dashboard', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Admin Dashboard
+| User Impersonation Leave (Accessible by any authenticated impersonated session)
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([
-    'auth',
-    'role:admin',
-])->group(function () {
-
-    Route::get('/admin', [
-        AuthorizationDashboardController::class,
-        'index',
-    ])->name('admin.dashboard');
-
-});
+Route::post('/impersonate/leave', [ImpersonationController::class, 'leave'])
+    ->middleware(['auth'])
+    ->name('impersonate.leave');
 
 /*
 |--------------------------------------------------------------------------
-| User Management
+| Admin Area
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([
-    'auth',
-    'permission:users.view',
-])->group(function () {
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
 
-    Route::get('/admin/users', [
-        UserManagementController::class,
-        'index',
-    ])->name('admin.users.index');
+    // Dashboard
+    Route::get('/', [AuthorizationDashboardController::class, 'index'])->name('dashboard');
 
-});
+    // User Impersonation
+    Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate'])->name('impersonate');
 
-Route::middleware([
-    'auth',
-    'permission:users.edit',
-])->group(function () {
+    // Users & Permissions Analyzer
+    Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
+    Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+    Route::get('/users/{user}/permissions-analyzer', [UserManagementController::class, 'permissionsAnalyzer'])->name('users.analyzer');
+    Route::post('/users/{user}/test-permission', [UserManagementController::class, 'testPermission'])->name('users.test-permission');
 
-    Route::get('/admin/users/{user}/edit', [
-        UserManagementController::class,
-        'edit',
-    ])->name('admin.users.edit');
+    // Roles CRUD & Clone
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
+    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+    Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+    Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    Route::post('/roles/bulk-delete', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-delete');
+    Route::post('/roles/{role}/clone', [RoleController::class, 'clone'])->name('roles.clone');
 
-    Route::put('/admin/users/{user}', [
-        UserManagementController::class,
-        'update',
-    ])->name('admin.users.update');
+    // Permissions CRUD & 1-Click Generator
+    Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
+    Route::get('/permissions/create', [PermissionController::class, 'create'])->name('permissions.create');
+    Route::post('/permissions', [PermissionController::class, 'store'])->name('permissions.store');
+    Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
+    Route::post('/permissions/bulk-delete', [PermissionController::class, 'bulkDestroy'])->name('permissions.bulk-delete');
+    Route::post('/permissions/generate-crud', [PermissionController::class, 'generateCrud'])->name('permissions.generate-crud');
 
-});
-
-/*
-|--------------------------------------------------------------------------
-| Role Management
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware([
-    'auth',
-    'permission:roles.view',
-])->group(function () {
-
-    Route::get('/admin/roles', [
-        RoleController::class,
-        'index',
-    ])->name('admin.roles.index');
-
-});
-
-Route::middleware([
-    'auth',
-    'permission:roles.create',
-])->group(function () {
-
-    Route::get('/admin/roles/create', [
-        RoleController::class,
-        'create',
-    ])->name('admin.roles.create');
-
-    Route::post('/admin/roles', [
-        RoleController::class,
-        'store',
-    ])->name('admin.roles.store');
-
-});
-
-Route::middleware([
-    'auth',
-    'permission:roles.edit',
-])->group(function () {
-
-    Route::get('/admin/roles/{role}/edit', [
-        RoleController::class,
-        'edit',
-    ])->name('admin.roles.edit');
-
-    Route::put('/admin/roles/{role}', [
-        RoleController::class,
-        'update',
-    ])->name('admin.roles.update');
-
-});
-
-Route::delete('/admin/roles/{role}', [
-    RoleController::class,
-    'destroy',
-])
-    ->middleware([
-        'auth',
-        'permission:roles.delete',
-    ])
-    ->name('admin.roles.destroy');
-
-/*
-|--------------------------------------------------------------------------
-| Bulk Role Delete
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/admin/roles/bulk-delete', [
-    RoleController::class,
-    'bulkDestroy',
-])
-    ->middleware([
-        'auth',
-        'permission:roles.delete',
-    ])
-    ->name('admin.roles.bulk-delete');
-
-/*
-|--------------------------------------------------------------------------
-| Permission Management
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware([
-    'auth',
-    'permission:permissions.view',
-])->group(function () {
-
-    Route::get('/admin/permissions', [
-        PermissionController::class,
-        'index',
-    ])->name('admin.permissions.index');
-
-});
-
-Route::middleware([
-    'auth',
-    'permission:permissions.create',
-])->group(function () {
-
-    Route::get('/admin/permissions/create', [
-        PermissionController::class,
-        'create',
-    ])->name('admin.permissions.create');
-
-    Route::post('/admin/permissions', [
-        PermissionController::class,
-        'store',
-    ])->name('admin.permissions.store');
-
-});
-
-Route::delete('/admin/permissions/{permission}', [
-    PermissionController::class,
-    'destroy',
-])
-    ->middleware([
-        'auth',
-        'permission:permissions.delete',
-    ])
-    ->name('admin.permissions.destroy');
-
-/*
-|--------------------------------------------------------------------------
-| Bulk Permission Delete
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/admin/permissions/bulk-delete', [
-    PermissionController::class,
-    'bulkDestroy',
-])
-    ->middleware([
-        'auth',
-        'permission:permissions.delete',
-    ])
-    ->name('admin.permissions.bulk-delete');
-
-/*
-|--------------------------------------------------------------------------
-| Existing Permission Route
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware([
-    'auth',
-    'permission:edit orders',
-])->group(function () {
-
-    Route::get('/orders/edit', function () {
-        return 'Edit Orders Page';
-    })->name('orders.edit');
-
+    // RBAC Schema JSON Export & Import
+    Route::get('/schema/export-json', [PermissionController::class, 'exportJson'])->name('schema.export-json');
+    Route::post('/schema/import-json', [PermissionController::class, 'importJson'])->name('schema.import-json');
 });
 
 /*
@@ -245,22 +85,9 @@ Route::middleware([
 */
 
 Route::middleware('auth')->group(function () {
-
-    Route::get('/profile', [
-        ProfileController::class,
-        'edit',
-    ])->name('profile.edit');
-
-    Route::patch('/profile', [
-        ProfileController::class,
-        'update',
-    ])->name('profile.update');
-
-    Route::delete('/profile', [
-        ProfileController::class,
-        'destroy',
-    ])->name('profile.destroy');
-
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 require __DIR__.'/auth.php';
