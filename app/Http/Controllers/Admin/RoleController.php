@@ -17,17 +17,11 @@ class RoleController extends Controller
     public function index(Request $request): View
     {
         $search = $request->input('search');
-
         $sort = $request->input('sort', 'name');
-
         $direction = $request->input('direction', 'asc');
-
         $perPage = (int) $request->input('per_page', 10);
 
-        $allowedSorts = [
-            'name',
-            'created_at',
-        ];
+        $allowedSorts = ['name', 'created_at'];
 
         if (!in_array($sort, $allowedSorts, true)) {
             $sort = 'name';
@@ -82,9 +76,7 @@ class RoleController extends Controller
                 'max:255',
                 'unique:roles,name',
             ],
-
             'permissions' => ['nullable', 'array'],
-
             'permissions.*' => [
                 'exists:permissions,name',
             ],
@@ -110,10 +102,7 @@ class RoleController extends Controller
     public function edit(Role $role): View
     {
         $permissions = Permission::orderBy('name')->get();
-
-        $rolePermissions = $role->permissions
-            ->pluck('name')
-            ->toArray();
+        $rolePermissions = $role->permissions->pluck('name')->toArray();
 
         return view('admin.roles.edit', compact(
             'role',
@@ -125,10 +114,8 @@ class RoleController extends Controller
     /**
      * Update a role.
      */
-    public function update(
-        Request $request,
-        Role $role
-    ): RedirectResponse {
+    public function update(Request $request, Role $role): RedirectResponse
+    {
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -136,9 +123,7 @@ class RoleController extends Controller
                 'max:255',
                 'unique:roles,name,' . $role->id,
             ],
-
             'permissions' => ['nullable', 'array'],
-
             'permissions.*' => [
                 'exists:permissions,name',
             ],
@@ -158,22 +143,36 @@ class RoleController extends Controller
     }
 
     /**
-     * Delete a single role.
+     * Clone an existing role with all its permissions.
+     */
+    public function clone(Request $request, Role $role): RedirectResponse
+    {
+        $validated = $request->validate([
+            'new_name' => ['required', 'string', 'max:255', 'unique:roles,name'],
+        ]);
+
+        $newRole = Role::create([
+            'name' => $validated['new_name'],
+            'guard_name' => $role->guard_name ?? 'web',
+        ]);
+
+        $permissions = $role->permissions->pluck('name')->toArray();
+        if (!empty($permissions)) {
+            $newRole->syncPermissions($permissions);
+        }
+
+        return redirect()
+            ->route('admin.roles.index')
+            ->with('success', "Role '{$role->name}' successfully cloned as '{$newRole->name}' with " . count($permissions) . " permissions.");
+    }
+
+    /**
+     * Delete a role.
      */
     public function destroy(Role $role): RedirectResponse
     {
         if ($role->name === 'admin') {
-            return back()->with(
-                'error',
-                'The admin role cannot be deleted.'
-            );
-        }
-
-        if ($role->users()->exists()) {
-            return back()->with(
-                'error',
-                'This role cannot be deleted because users are assigned to it.'
-            );
+            return back()->with('error', 'The admin role cannot be deleted.');
         }
 
         $role->delete();
@@ -189,51 +188,20 @@ class RoleController extends Controller
     public function bulkDestroy(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'roles' => [
-                'required',
-                'array',
-                'min:1',
-            ],
-
-            'roles.*' => [
-                'integer',
-                'exists:roles,id',
-            ],
+            'ids' => ['required', 'array'],
+            'ids.*' => ['exists:roles,id'],
         ]);
 
-        $deleted = 0;
-        $skipped = 0;
-
-        $roles = Role::whereIn('id', $validated['roles'])
+        $roles = Role::whereIn('id', $validated['ids'])
+            ->where('name', '!=', 'admin')
             ->get();
 
         foreach ($roles as $role) {
-
-            // Never delete admin role.
-            if ($role->name === 'admin') {
-                $skipped++;
-                continue;
-            }
-
-            // Do not delete roles assigned to users.
-            if ($role->users()->exists()) {
-                $skipped++;
-                continue;
-            }
-
             $role->delete();
-
-            $deleted++;
-        }
-
-        $message = "{$deleted} role(s) deleted successfully.";
-
-        if ($skipped > 0) {
-            $message .= " {$skipped} role(s) skipped because they are protected, are the admin role, or have assigned users.";
         }
 
         return redirect()
             ->route('admin.roles.index')
-            ->with('success', $message);
+            ->with('success', 'Selected roles deleted successfully.');
     }
 }
