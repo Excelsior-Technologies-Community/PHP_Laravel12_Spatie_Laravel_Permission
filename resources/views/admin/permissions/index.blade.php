@@ -8,24 +8,121 @@
                 Permission Management
             </h2>
 
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2" x-data="{ openCrudModal: false }">
 
                 <a
                     href="{{ route('admin.dashboard') }}"
-                    class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800"
+                    class="px-4 py-2 bg-gray-700 text-white text-sm font-semibold rounded-md hover:bg-gray-800 transition"
                 >
                     Admin Dashboard
                 </a>
 
                 @can('permissions.create')
+                    <button
+                        type="button"
+                        @click="openCrudModal = true"
+                        class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-md hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm"
+                    >
+                        <span>⚡</span>
+                        <span>Generate CRUD</span>
+                    </button>
 
                     <a
                         href="{{ route('admin.permissions.create') }}"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                        class="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition"
                     >
                         + Create Permission
                     </a>
 
+                    {{-- CRUD Generator Modal --}}
+                    <div
+                        x-show="openCrudModal"
+                        class="fixed inset-0 z-50 overflow-y-auto"
+                        style="display: none;"
+                        x-cloak
+                    >
+                        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" @click="openCrudModal = false"></div>
+
+                        <div class="flex min-h-full items-center justify-center p-4">
+                            <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 text-left transform transition-all border border-gray-100">
+                                <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                        <span class="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm">⚡</span>
+                                        1-Click Module CRUD Generator
+                                    </h3>
+                                    <button @click="openCrudModal = false" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+                                </div>
+
+                                <form method="POST" action="{{ route('admin.permissions.generate-crud') }}" class="mt-4">
+                                    @csrf
+
+                                    <div class="mb-4">
+                                        <label for="module" class="block text-sm font-semibold text-gray-700 mb-1">Module / Entity Name</label>
+                                        <input
+                                            type="text"
+                                            name="module"
+                                            id="module"
+                                            required
+                                            placeholder="e.g. invoices, products, reports, orders"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                                        >
+                                        <p class="text-xs text-gray-500 mt-1">Slug format will be automatically applied (e.g. <code>products</code> &rarr; <code>products.view</code>, <code>products.create</code>, etc.)</p>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Actions to Generate</label>
+                                        <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="view" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.view</code> (Read)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="create" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.create</code> (Create)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="edit" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.edit</code> (Update)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="delete" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.delete</code> (Delete)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="export" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.export</code> (Export)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                                <input type="checkbox" name="actions[]" value="import" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                                <span><code>.import</code> (Import)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 mb-5 flex items-start gap-2">
+                                        <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        <span>Generated permissions will automatically be synced and granted to the <strong>Admin</strong> role.</span>
+                                    </div>
+
+                                    <div class="flex justify-end gap-3">
+                                        <button
+                                            type="button"
+                                            @click="openCrudModal = false"
+                                            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-600/20"
+                                        >
+                                            ⚡ Generate Now
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 @endcan
 
             </div>
